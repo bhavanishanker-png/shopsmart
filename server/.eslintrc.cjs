@@ -4,10 +4,10 @@ module.exports = {
     node: true,
     es2022: true,
   },
-  extends: ["eslint:recommended"],
+  extends: ['eslint:recommended'],
   parserOptions: {
-    ecmaVersion: "latest",
-    sourceType: "script",
+    ecmaVersion: 'latest',
+    sourceType: 'script',
   },
-  ignorePatterns: ["node_modules/"],
-};
+  ignorePatterns: ['node_modules/'],
+}

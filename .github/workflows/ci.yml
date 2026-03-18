@@ -2,9 +2,9 @@ name: CI - Build Verification
 
 on:
   push:
-    branches: ["**"]
+    branches: ['**']
   pull_request:
-    branches: ["**"]
+    branches: ['**']
 
 jobs:
   build:
@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "npm"
+          cache: 'npm'
           cache-dependency-path: |
             client/package-lock.json
             server/package-lock.json
@@ -39,9 +39,17 @@ jobs:
         working-directory: ./client
         run: npm run lint
 
+      - name: Check client formatting
+        working-directory: ./client
+        run: npm run format:check
+
       - name: Lint server
         working-directory: ./server
         run: npm run lint
+
+      - name: Check server formatting
+        working-directory: ./server
+        run: npm run format:check
 
       - name: Test client
         working-directory: ./client
