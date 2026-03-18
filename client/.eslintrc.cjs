@@ -17,8 +17,8 @@ module.exports = {
     },
   },
   globals: {
-    global: 'readonly',
-    process: 'readonly',
+    global: "readonly",
+    process: "readonly",
   },
   settings: {
     react: {
@@ -28,7 +28,7 @@ module.exports = {
   ignorePatterns: ["dist/", "node_modules/", "e2e/", "test-results/"],
   overrides: [
     {
-      files: ['vite.config.js', 'playwright.config.js'],
+      files: ["vite.config.js", "playwright.config.js"],
       env: {
         node: true,
       },
