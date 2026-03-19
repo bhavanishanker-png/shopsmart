@@ -29,7 +29,7 @@ function App() {
         )}
       </div>
       <p className="hint">
-        Edit <code>src/App.jsx</code> and save to test HMR
+        Edit <code>src/App.jsx</code> and save to test
       </p>
     </div>
   )
