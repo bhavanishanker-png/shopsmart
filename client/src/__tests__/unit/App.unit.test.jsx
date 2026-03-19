@@ -25,6 +25,7 @@ describe('App Unit Tests', () => {
 
   // 1. Renders the main heading
   it('renders ShopSmart heading', () => {
+    global.fetch = vi.fn(() => new Promise(() => {}))
     render(<App />)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/ShopSmart/i)
   })
@@ -62,6 +63,7 @@ describe('App Unit Tests', () => {
 
   // 6. Renders the card container
   it('renders card container', () => {
+    global.fetch = vi.fn(() => new Promise(() => {}))
     render(<App />)
     const card = document.querySelector('.card')
     expect(card).toBeInTheDocument()
@@ -69,6 +71,7 @@ describe('App Unit Tests', () => {
 
   // 7. Renders the hint text
   it('renders hint text', () => {
+    global.fetch = vi.fn(() => new Promise(() => {}))
     render(<App />)
     expect(screen.getByText(/Edit/i)).toBeInTheDocument()
     expect(screen.getByText('src/App.jsx')).toBeInTheDocument()
@@ -86,7 +89,7 @@ describe('App Unit Tests', () => {
     })
 
     // App should still render without crashing
-    expect(screen.getByText('ShopSmart')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/ShopSmart/i)
     consoleSpy.mockRestore()
   })
 
