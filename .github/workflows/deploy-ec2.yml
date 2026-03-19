@@ -22,14 +22,13 @@ jobs:
           DEFAULT_BRANCH: main
           TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
           APP_DIR: ${{ vars.EC2_APP_DIR }}
-          SERVICE_NAME: ${{ vars.EC2_SERVICE_NAME }}
           PM2_APP_NAME: ${{ vars.EC2_PM2_APP_NAME }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_PORT || '22' }}
-          envs: GITHUB_REPOSITORY,DEFAULT_BRANCH,TOKEN,APP_DIR,SERVICE_NAME,PM2_APP_NAME
+          envs: GITHUB_REPOSITORY,DEFAULT_BRANCH,TOKEN,APP_DIR,PM2_APP_NAME
           script: |
             set -euo pipefail
 
@@ -55,13 +54,6 @@ jobs:
             cd server
             npm ci --omit=dev
 
-            if [ -n "${SERVICE_NAME:-}" ] && command -v systemctl >/dev/null 2>&1; then
-              if systemctl list-unit-files | grep -q "^${SERVICE_NAME}.service"; then
-                sudo systemctl restart "${SERVICE_NAME}"
-                exit 0
-              fi
-            fi
-
             if command -v pm2 >/dev/null 2>&1; then
               APP_NAME="${PM2_APP_NAME:-shopsmart-backend}"
               if pm2 describe "${APP_NAME}" >/dev/null 2>&1; then
@@ -70,8 +62,10 @@ jobs:
                 pm2 start src/index.js --name "${APP_NAME}"
               fi
               pm2 save
-              exit 0
             fi
 
-            pkill -f "node src/index.js" || true
-            nohup npm start >/tmp/shopsmart-backend.log 2>&1 &
+            cd ../client
+            npm install
+            npm run build
+
+            sudo systemctl restart nginx
