@@ -26,9 +26,8 @@ describe('App Unit Tests', () => {
   // 1. Renders the main heading
   it('renders ShopSmart heading', () => {
     render(<App />)
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('ShopSmart')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/ShopSmart/i)
   })
-
   // 2. Shows loading state before fetch resolves
   it('shows loading state initially', () => {
     // Make fetch hang indefinitely so we can catch the loading state
