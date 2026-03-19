@@ -4,9 +4,7 @@ import App from '../../App'
 
 describe('App Unit Tests', () => {
   beforeEach(() => {
-    global.fetch = vi.fn(() => Promise.resolve({
-      json: () => Promise.resolve({ status: 'ok' })
-    }))
+    global.fetch = vi.fn(() => new Promise(() => {}))
   })
 
   afterEach(() => {
