@@ -1,6 +1,6 @@
 import React from 'react'
 
-export function Header({ cartCount, backendStatus, onCartClick, onHomeClick }) {
+export function Header({ cartCount, onCartClick, onHomeClick }) {
   return (
     <header className="header">
       <div className="header-main">

@@ -1,6 +1,6 @@
 import React from 'react'
 
-export function Banner({ backendStatus }) {
+export function Banner() {
   return (
     <section className="hero-banner">
       <div className="hero-background">
