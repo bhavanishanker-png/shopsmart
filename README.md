@@ -4,6 +4,7 @@ A modern, production-ready e-commerce application with comprehensive CI/CD, auto
 
 ## Table of Contents
 
+- [Current Repository State (Source of Truth)](#current-repository-state-source-of-truth)
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
 - [Technology Stack](#technology-stack)
@@ -12,6 +13,68 @@ A modern, production-ready e-commerce application with comprehensive CI/CD, auto
 - [Challenges & Solutions](#challenges--solutions)
 - [Getting Started](#getting-started)
 - [GitHub Actions EC2 Deployment](#github-actions-ec2-deployment)
+
+---
+
+## Current Repository State (Source of Truth)
+
+This README contains architecture and process notes. For the exact, current implementation snapshot, use:
+
+- `EXPLANATION.md` (kept aligned to present files)
+
+Current verified state in this repository:
+
+- Frontend: React + Vite storefront with Header, Banner, Product grid, Cart sidebar, Product modal, Footer
+- Backend: Express service with `GET /api/health` and `GET /`
+- Tests: Vitest (7), Playwright E2E (7), Jest backend (1)
+- CI: lint + format + tests + frontend build (Node 18.x and 20.x)
+- Deploy: EC2 SSH workflow, server deps install, PM2 restart/start, frontend build, nginx restart
+
+### Commands To Show All Tasks Done
+
+Run this from project root:
+
+```bash
+cd /Users/bhavanishanker/shopsmart
+
+echo "===== CLEAN FULL TASK REPORT ====="
+echo "[1] Git status" && git status --short
+echo "[2] Recent commits" && git log --oneline -n 5
+
+echo "[3] Frontend lint"
+cd client && npm run -s lint && echo "PASS: frontend lint"
+
+echo "[4] Frontend format"
+npm run -s format:check && echo "PASS: frontend format"
+
+echo "[5] Frontend unit+integration+e2e"
+npm run -s test:all && echo "PASS: frontend tests"
+
+echo "[6] Frontend build"
+npm run -s build && echo "PASS: frontend build"
+
+echo "[7] Backend lint"
+cd ../server && npm run -s lint && echo "PASS: backend lint"
+
+echo "[8] Backend format"
+npm run -s format:check && echo "PASS: backend format"
+
+echo "[9] Backend tests"
+npm test --silent && echo "PASS: backend tests"
+
+echo "===== CLEAN REPORT COMPLETE ====="
+```
+
+For cleaner E2E logs, start backend first:
+
+```bash
+# Terminal 1
+npm --prefix /Users/bhavanishanker/shopsmart/server start
+
+# Terminal 2
+cd /Users/bhavanishanker/shopsmart/client
+npm run -s test:e2e
+```
 
 ---
 
