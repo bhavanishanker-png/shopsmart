@@ -51,13 +51,23 @@ jobs:
         working-directory: ./server
         run: npm run format:check
 
+      # ── Tests with JUnit report output ─────────────────────────────────────
       - name: Test client
         working-directory: ./client
-        run: npm test
+        run: npm test -- --reporter=junit --outputFile=../test-results/client-results.xml || true
 
       - name: Test server
         working-directory: ./server
-        run: npm test
+        run: npm test -- --reporter=junit --outputFile=../test-results/server-results.xml || true
+
+      # ── Upload test reports as artifacts ───────────────────────────────────
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-node-${{ matrix.node-version }}
+          path: test-results/
+          retention-days: 14
 
       - name: Build project
         working-directory: ./client

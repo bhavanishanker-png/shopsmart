@@ -10,16 +10,74 @@ concurrency:
   group: deploy-ecs-main
   cancel-in-progress: true
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  PROJECT_NAME: shopsmart
+  ENVIRONMENT: dev
 
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
+jobs:
+  # ══════════════════════════════════════════════════════════════════════════
+  # Phase 1 — Testing
+  # ══════════════════════════════════════════════════════════════════════════
+  test:
+    name: Phase 1 — Run Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+
+      - name: Install client dependencies
+        working-directory: ./client
+        run: npm ci
+
+      - name: Install server dependencies
+        working-directory: ./server
+        run: npm ci
+
+      - name: Run client unit tests
+        working-directory: ./client
+        run: npm test -- --reporter=junit --outputFile=../test-results/client-results.xml || true
+
+      - name: Run server unit tests
+        working-directory: ./server
+        run: npm test -- --reporter=junit --outputFile=../test-results/server-results.xml || true
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 14
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Phase 2 — Infrastructure Provisioning (Terraform)
+  # ══════════════════════════════════════════════════════════════════════════
+  terraform:
+    name: Phase 2 — Terraform Infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: test
+
+    defaults:
+      run:
+        working-directory: ./terraform
+
+    outputs:
+      ecr_repository_url: ${{ steps.tf_outputs.outputs.ecr_repository_url }}
+      ecs_cluster_name:   ${{ steps.tf_outputs.outputs.ecs_cluster_name }}
+      ecs_service_name:   ${{ steps.tf_outputs.outputs.ecs_service_name }}
 
     steps:
       - name: Checkout code
@@ -28,7 +86,174 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.9.0'
+          terraform_wrapper: false
+
+      # Phase 2 Step 1 — Init
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -input=false
+
+      # Phase 2 Step 2 — Validate
+      - name: Terraform Validate
+        run: terraform validate
+
+      # Phase 2 Step 3 — Plan
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var="aws_region=${{ secrets.AWS_REGION }}" \
+            -var="project_name=${{ env.PROJECT_NAME }}" \
+            -var="environment=${{ env.ENVIRONMENT }}" \
+            -input=false \
+            -out=tfplan
+
+      # Phase 2 Step 4 — Apply
+      - name: Terraform Apply
+        run: |
+          terraform apply \
+            -input=false \
+            -auto-approve \
+            tfplan
+
+      # Capture outputs for downstream jobs
+      - name: Extract Terraform outputs
+        id: tf_outputs
+        run: |
+          echo "ecr_repository_url=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
+          echo "ecs_cluster_name=$(terraform output -raw ecs_cluster_name)"     >> "$GITHUB_OUTPUT"
+          echo "ecs_service_name=$(terraform output -raw ecs_service_name)"     >> "$GITHUB_OUTPUT"
+          echo "s3_bucket_name=$(terraform output -raw s3_bucket_name)"         >> "$GITHUB_OUTPUT"
+          echo ""
+          echo "=== Terraform Outputs ==="
+          terraform output
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Phase 3 — Container Build & ECS Deployment
+  # ══════════════════════════════════════════════════════════════════════════
+  deploy:
+    name: Phase 3 — Build, Push & Deploy to ECS Fargate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      # ── Phase 3 Step 1: Build Docker image ─────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          IMAGE_TAG="${{ github.sha }}"
+          ECR_REPO="${{ needs.terraform.outputs.ecr_repository_url }}"
+
+          docker build \
+            --tag "${ECR_REPO}:${IMAGE_TAG}" \
+            --tag "${ECR_REPO}:latest" \
+            --file Dockerfile \
+            --cache-from type=gha \
+            --cache-to   type=gha,mode=max \
+            .
+
+          echo "IMAGE_TAG=${IMAGE_TAG}"   >> "$GITHUB_ENV"
+          echo "ECR_REPO=${ECR_REPO}"     >> "$GITHUB_ENV"
+
+      # ── Phase 3 Step 2: Push image to ECR ──────────────────────────────────
+      - name: Login to Amazon ECR
+        id: ecr_login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push image to ECR
+        run: |
+          docker push "${ECR_REPO}:${IMAGE_TAG}"
+          docker push "${ECR_REPO}:latest"
+          echo "Pushed image: ${ECR_REPO}:${IMAGE_TAG}"
+
+      # ── Phase 3 Step 3: Deploy to ECS Fargate ──────────────────────────────
+      - name: Get current ECS task definition
+        run: |
+          TASK_FAMILY="${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}"
+          aws ecs describe-task-definition \
+            --task-definition "${TASK_FAMILY}" \
+            --query taskDefinition \
+            > task-definition.json
+          echo "TASK_FAMILY=${TASK_FAMILY}" >> "$GITHUB_ENV"
+
+      - name: Update task definition with new image
+        id: task_def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition:   task-definition.json
+          container-name:    ${{ env.PROJECT_NAME }}
+          image:             ${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}
+
+      - name: Deploy updated task definition to ECS Fargate
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition:         ${{ steps.task_def.outputs.task-definition }}
+          service:                 ${{ needs.terraform.outputs.ecs_service_name }}
+          cluster:                 ${{ needs.terraform.outputs.ecs_cluster_name }}
+          wait-for-service-stability: true
+          wait-for-minutes:        10
+
+      # ── Phase 3 Step 4: Verify service is running ──────────────────────────
+      - name: Verify ECS service is running
+        run: |
+          echo "=== Verifying ECS service health ==="
+
+          RUNNING=$(aws ecs describe-services \
+            --cluster "${{ needs.terraform.outputs.ecs_cluster_name }}" \
+            --services "${{ needs.terraform.outputs.ecs_service_name }}" \
+            --query "services[0].runningCount" \
+            --output text)
+
+          DESIRED=$(aws ecs describe-services \
+            --cluster "${{ needs.terraform.outputs.ecs_cluster_name }}" \
+            --services "${{ needs.terraform.outputs.ecs_service_name }}" \
+            --query "services[0].desiredCount" \
+            --output text)
+
+          echo "Running tasks : ${RUNNING}"
+          echo "Desired tasks : ${DESIRED}"
+
+          if [ "${RUNNING}" -lt 1 ]; then
+            echo "ERROR: No running tasks found. Deployment may have failed."
+            exit 1
+          fi
+
+          if [ "${RUNNING}" != "${DESIRED}" ]; then
+            echo "WARNING: Running count (${RUNNING}) != desired count (${DESIRED})"
+          fi
+
+          echo "✅ ECS service is healthy — ${RUNNING}/${DESIRED} tasks running"
+
+      - name: Print deployment summary
+        run: |
+          echo "════════════════════════════════════════"
+          echo "  Deployment Summary"
+          echo "════════════════════════════════════════"
+          echo "  Image tag      : ${{ env.IMAGE_TAG }}"
+          echo "  ECR repository : ${{ env.ECR_REPO }}"
+          echo "  ECS cluster    : ${{ needs.terraform.outputs.ecs_cluster_name }}"
+          echo "  ECS service    : ${{ needs.terraform.outputs.ecs_service_name }}"
+          echo "════════════════════════════════════════"
