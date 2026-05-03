@@ -206,7 +206,10 @@ jobs:
         id: build
         run: |
           IMAGE_TAG="${{ github.sha }}"
-          ECR_REPO="${{ needs.terraform.outputs.ecr_repository_url }}"
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}"
+
+          echo "Building image for ECR Repo: $ECR_REPO"
 
           docker build \
             --tag "${ECR_REPO}:${IMAGE_TAG}" \
@@ -248,28 +251,37 @@ jobs:
             --query taskDefinition \
             > task-definition.json
 
+      - name: Calculate Dynamic Variables
+        id: vars
+        run: |
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_URL="${AWS_ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}"
+          echo "ecr_url=$ECR_URL" >> "$GITHUB_OUTPUT"
+          echo "ecs_cluster=${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-cluster" >> "$GITHUB_OUTPUT"
+          echo "ecs_service=${{ env.PROJECT_NAME }}-svc" >> "$GITHUB_OUTPUT"
+
       - name: Update task definition with new image
         id: task_def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition:   task-definition.json
           container-name:    ${{ env.PROJECT_NAME }}
-          image:             ${{ needs.terraform.outputs.ecr_repository_url }}:${{ needs.build-and-push.outputs.image_tag }}
+          image:             ${{ steps.vars.outputs.ecr_url }}:${{ needs.build-and-push.outputs.image_tag }}
 
-      - name: Deploy updated task definition to ECS Fargate
+      - name: Deploy to ECS Fargate
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
-          task-definition:         ${{ steps.task_def.outputs.task-definition }}
-          service:                 ${{ needs.terraform.outputs.ecs_service_name }}
-          cluster:                 ${{ needs.terraform.outputs.ecs_cluster_name }}
+          task-definition: ${{ steps.task_def.outputs.task-definition }}
+          cluster:         ${{ steps.vars.outputs.ecs_cluster }}
+          service:         ${{ steps.vars.outputs.ecs_service }}
           wait-for-service-stability: true
           wait-for-minutes:        10
 
       - name: Verify ECS service is running
         run: |
           RUNNING=$(aws ecs describe-services \
-            --cluster "${{ needs.terraform.outputs.ecs_cluster_name }}" \
-            --services "${{ needs.terraform.outputs.ecs_service_name }}" \
+            --cluster "${{ steps.vars.outputs.ecs_cluster }}" \
+            --services "${{ steps.vars.outputs.ecs_service }}" \
             --query "services[0].runningCount" \
             --output text)
           if [ "${RUNNING}" -lt 1 ]; then
@@ -301,11 +313,16 @@ jobs:
 
       - name: Update kubeconfig
         run: |
-          aws eks update-kubeconfig --name ${{ needs.terraform.outputs.eks_cluster_name }} --region ${{ secrets.AWS_REGION }}
+          aws eks update-kubeconfig \
+            --region ${{ secrets.AWS_REGION }} \
+            --name ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-eks
 
-      - name: Replace image in Kubernetes manifests
+      - name: Apply Kubernetes manifests
         run: |
-          IMAGE="${{ needs.terraform.outputs.ecr_repository_url }}:${{ needs.build-and-push.outputs.image_tag }}"
+          cd kubernetes
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_URL="${AWS_ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}"
+          IMAGE="${ECR_URL}:${{ needs.build-and-push.outputs.image_tag }}"
           sed -i "s|REPLACE_ME_IMAGE_URL|$IMAGE|g" k8s/deployment.yaml
 
       - name: Deploy to EKS
