@@ -102,15 +102,22 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: terraform/terraform.tfstate
-          key: terraform-state-v5-main-${{ github.sha }}
+          key: terraform-state-main-${{ github.sha }}
           restore-keys: |
-            terraform-state-v5-main-
+            terraform-state-main-
 
       - name: Terraform Init
         run: terraform init -input=false
 
       - name: Terraform Validate
         run: terraform validate
+
+      - name: Force cleanup blocking ECS services
+        run: |
+          echo "Force-deleting the active ECS service that is blocking Terraform from deleting the old cluster..."
+          aws ecs update-service --cluster shopsmart-app-dev-cluster --service shopsmart-app-svc --desired-count 0 || true
+          aws ecs delete-service --cluster shopsmart-app-dev-cluster --service shopsmart-app-svc --force || true
+          sleep 10
 
       - name: Terraform Plan
         run: |
@@ -148,7 +155,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: terraform/terraform.tfstate
-          key: terraform-state-v5-main-${{ github.sha }}
+          key: terraform-state-main-${{ github.sha }}
 
   # ══════════════════════════════════════════════════════════════════════════
   # Phase 3 — Container Build & Push
