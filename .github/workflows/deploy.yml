@@ -114,9 +114,13 @@ jobs:
 
       - name: Force cleanup blocking ECS services
         run: |
-          echo "Force-deleting the active ECS service that is blocking Terraform from deleting the old cluster..."
-          aws ecs update-service --cluster shopsmart-app-dev-cluster --service shopsmart-app-svc --desired-count 0 || true
-          aws ecs delete-service --cluster shopsmart-app-dev-cluster --service shopsmart-app-svc --force || true
+          echo "Finding and force-deleting active ECS services that are blocking Terraform from deleting the old cluster..."
+          SERVICES=$(aws ecs list-services --cluster shopsmart-app-dev-cluster --query "serviceArns" --output text 2>/dev/null || echo "")
+          for SERVICE in $SERVICES; do
+            echo "Deleting service: $SERVICE"
+            aws ecs update-service --cluster shopsmart-app-dev-cluster --service "$SERVICE" --desired-count 0 || true
+            aws ecs delete-service --cluster shopsmart-app-dev-cluster --service "$SERVICE" --force || true
+          done
           sleep 10
 
       - name: Terraform Plan
