@@ -129,15 +129,16 @@ jobs:
             -var="aws_region=${{ secrets.AWS_REGION }}" \
             -var="project_name=${{ env.PROJECT_NAME }}" \
             -var="environment=${{ env.ENVIRONMENT }}" \
-            -input=false \
-            -out=tfplan
+            -input=false
 
       - name: Terraform Apply
         run: |
           terraform apply \
+            -var="aws_region=${{ secrets.AWS_REGION }}" \
+            -var="project_name=${{ env.PROJECT_NAME }}" \
+            -var="environment=${{ env.ENVIRONMENT }}" \
             -input=false \
-            -auto-approve \
-            tfplan
+            -auto-approve
 
       - name: Extract Terraform outputs
         id: tf_outputs
@@ -160,7 +161,8 @@ jobs:
           echo "ECS Cluster: $ecs_cluster"
           echo "ECS Service: $ecs_svc"
           echo "EKS Cluster: $eks_cluster"
-          echo "S3 Bucket: $s3_bucket"
+          echo "=== All Terraform Outputs ==="
+          terraform output -json
 
       - name: Save Terraform state
         if: always()
