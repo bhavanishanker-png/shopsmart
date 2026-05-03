@@ -258,7 +258,7 @@ jobs:
           ECR_URL="${AWS_ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}"
           echo "ecr_url=$ECR_URL" >> "$GITHUB_OUTPUT"
           echo "ecs_cluster=${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-cluster" >> "$GITHUB_OUTPUT"
-          echo "ecs_service=${{ env.PROJECT_NAME }}-svc" >> "$GITHUB_OUTPUT"
+          echo "ecs_service=${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-service" >> "$GITHUB_OUTPUT"
 
       - name: Update task definition with new image
         id: task_def
