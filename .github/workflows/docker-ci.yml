@@ -22,7 +22,7 @@ jobs:
         run: docker build -t shopsmart-frontend:ci .
 
       - name: Run container
-        run: docker run -d --name shopsmart-frontend-ci -p 8080:80 shopsmart-frontend:ci
+        run: docker run -d --name shopsmart-frontend-ci -p 8080:8080 shopsmart-frontend:ci
 
       - name: Wait for container startup
         run: |
