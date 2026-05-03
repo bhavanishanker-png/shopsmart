@@ -105,11 +105,14 @@ data "aws_vpc" "default" {
   default = true
 }
 
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
+data "aws_subnet" "public_a" {
+  vpc_id            = data.aws_vpc.default.id
+  availability_zone = "${var.aws_region}a"
+}
+
+data "aws_subnet" "public_b" {
+  vpc_id            = data.aws_vpc.default.id
+  availability_zone = "${var.aws_region}b"
 }
 
 # ── Security Groups ────────────────────────────────────────────────────────────
@@ -163,7 +166,7 @@ resource "aws_lb" "main" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = data.aws_subnets.default.ids
+  subnets            = [data.aws_subnet.public_a.id, data.aws_subnet.public_b.id]
 
   tags = { Name = "${var.project_name}-alb" }
 }
@@ -287,7 +290,7 @@ resource "aws_ecs_service" "app" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = data.aws_subnets.default.ids
+    subnets          = [data.aws_subnet.public_a.id, data.aws_subnet.public_b.id]
     security_groups  = [aws_security_group.ecs_sg.id]
     assign_public_ip = true
   }
