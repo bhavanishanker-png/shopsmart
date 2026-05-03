@@ -142,17 +142,25 @@ jobs:
       - name: Extract Terraform outputs
         id: tf_outputs
         run: |
-          # Use -json to ensure we only get the values without any Terraform warnings that could break multiline output
-          terraform output -json > tf_outputs.json
+          # Use -raw which is completely bulletproof against JSON parsing errors
+          ecr_url=$(terraform output -raw ecr_repository_url 2>/dev/null || echo "")
+          ecs_cluster=$(terraform output -raw ecs_cluster_name 2>/dev/null || echo "")
+          ecs_svc=$(terraform output -raw ecs_service_name 2>/dev/null || echo "")
+          eks_cluster=$(terraform output -raw eks_cluster_name 2>/dev/null || echo "")
+          s3_bucket=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "")
+
+          echo "ecr_repository_url=$ecr_url" >> "$GITHUB_OUTPUT"
+          echo "ecs_cluster_name=$ecs_cluster" >> "$GITHUB_OUTPUT"
+          echo "ecs_service_name=$ecs_svc" >> "$GITHUB_OUTPUT"
+          echo "eks_cluster_name=$eks_cluster" >> "$GITHUB_OUTPUT"
+          echo "s3_bucket_name=$s3_bucket" >> "$GITHUB_OUTPUT"
           
-          echo "ecr_repository_url=$(jq -r '.ecr_repository_url.value // empty' tf_outputs.json)" >> "$GITHUB_OUTPUT"
-          echo "ecs_cluster_name=$(jq -r '.ecs_cluster_name.value // empty' tf_outputs.json)" >> "$GITHUB_OUTPUT"
-          echo "ecs_service_name=$(jq -r '.ecs_service_name.value // empty' tf_outputs.json)" >> "$GITHUB_OUTPUT"
-          echo "eks_cluster_name=$(jq -r '.eks_cluster_name.value // empty' tf_outputs.json)" >> "$GITHUB_OUTPUT"
-          echo "s3_bucket_name=$(jq -r '.s3_bucket_name.value // empty' tf_outputs.json)" >> "$GITHUB_OUTPUT"
-          
-          echo "=== Terraform Outputs ==="
-          cat tf_outputs.json
+          echo "=== Extracted Outputs ==="
+          echo "ECR URL: $ecr_url"
+          echo "ECS Cluster: $ecs_cluster"
+          echo "ECS Service: $ecs_svc"
+          echo "EKS Cluster: $eks_cluster"
+          echo "S3 Bucket: $s3_bucket"
 
       - name: Save Terraform state
         if: always()
