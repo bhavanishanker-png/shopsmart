@@ -98,8 +98,8 @@ jobs:
           terraform_version: '1.9.0'
           terraform_wrapper: false
 
-      - name: Cache Terraform state
-        uses: actions/cache@v4
+      - name: Restore Terraform state
+        uses: actions/cache/restore@v4
         with:
           path: terraform/terraform.tfstate
           key: terraform-state-main-${{ github.sha }}
@@ -142,6 +142,13 @@ jobs:
           
           echo "=== Terraform Outputs ==="
           cat tf_outputs.json
+
+      - name: Save Terraform state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: terraform/terraform.tfstate
+          key: terraform-state-main-${{ github.sha }}
 
   # ══════════════════════════════════════════════════════════════════════════
   # Phase 3 — Container Build & Push

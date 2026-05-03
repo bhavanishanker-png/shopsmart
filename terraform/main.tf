@@ -117,7 +117,7 @@ data "aws_subnet" "public_b" {
 
 # ── Security Groups ────────────────────────────────────────────────────────────
 resource "aws_security_group" "alb_sg" {
-  name        = "${var.project_name}-alb-sg"
+  name        = "${var.project_name}-alb-sg-new"
   description = "Allow HTTP inbound to ALB"
   vpc_id      = data.aws_vpc.default.id
 
@@ -139,7 +139,7 @@ resource "aws_security_group" "alb_sg" {
 }
 
 resource "aws_security_group" "ecs_sg" {
-  name        = "${var.project_name}-ecs-sg"
+  name        = "${var.project_name}-ecs-sg-new"
   description = "Allow traffic from ALB to ECS tasks"
   vpc_id      = data.aws_vpc.default.id
 
@@ -234,7 +234,7 @@ data "aws_iam_role" "lab_role" {
 
 # ── CloudWatch Log Group ───────────────────────────────────────────────────────
 resource "aws_cloudwatch_log_group" "ecs_logs" {
-  name              = "/ecs/${var.project_name}-${var.environment}"
+  name              = "/ecs/${var.project_name}-new"
   retention_in_days = 14
 
   tags = { ManagedBy = "terraform" }
