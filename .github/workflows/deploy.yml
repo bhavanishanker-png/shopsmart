@@ -319,7 +319,6 @@ jobs:
 
       - name: Apply Kubernetes manifests
         run: |
-          cd kubernetes
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           ECR_URL="${AWS_ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}"
           IMAGE="${ECR_URL}:${{ needs.build-and-push.outputs.image_tag }}"
