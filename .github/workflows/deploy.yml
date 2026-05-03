@@ -102,9 +102,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: terraform/terraform.tfstate
-          key: terraform-state-main-${{ github.sha }}
+          key: terraform-state-v5-main-${{ github.sha }}
           restore-keys: |
-            terraform-state-main-
+            terraform-state-v5-main-
 
       - name: Terraform Init
         run: terraform init -input=false
@@ -148,7 +148,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: terraform/terraform.tfstate
-          key: terraform-state-main-${{ github.sha }}
+          key: terraform-state-v5-main-${{ github.sha }}
 
   # ══════════════════════════════════════════════════════════════════════════
   # Phase 3 — Container Build & Push
