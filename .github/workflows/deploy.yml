@@ -123,14 +123,17 @@ jobs:
       - name: Extract Terraform outputs
         id: tf_outputs
         run: |
-          echo "ecr_repository_url=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
-          echo "ecs_cluster_name=$(terraform output -raw ecs_cluster_name)"     >> "$GITHUB_OUTPUT"
-          echo "ecs_service_name=$(terraform output -raw ecs_service_name)"     >> "$GITHUB_OUTPUT"
-          echo "eks_cluster_name=$(terraform output -raw eks_cluster_name)"     >> "$GITHUB_OUTPUT"
-          echo "s3_bucket_name=$(terraform output -raw s3_bucket_name)"         >> "$GITHUB_OUTPUT"
-          echo ""
+          # Use -json to ensure we only get the values without any Terraform warnings that could break multiline output
+          terraform output -json > tf_outputs.json
+          
+          echo "ecr_repository_url=$(jq -r '.ecr_repository_url.value // empty' tf_outputs.json)" >> "$GITHUB_OUTPUT"
+          echo "ecs_cluster_name=$(jq -r '.ecs_cluster_name.value // empty' tf_outputs.json)" >> "$GITHUB_OUTPUT"
+          echo "ecs_service_name=$(jq -r '.ecs_service_name.value // empty' tf_outputs.json)" >> "$GITHUB_OUTPUT"
+          echo "eks_cluster_name=$(jq -r '.eks_cluster_name.value // empty' tf_outputs.json)" >> "$GITHUB_OUTPUT"
+          echo "s3_bucket_name=$(jq -r '.s3_bucket_name.value // empty' tf_outputs.json)" >> "$GITHUB_OUTPUT"
+          
           echo "=== Terraform Outputs ==="
-          terraform output
+          cat tf_outputs.json
 
   # ══════════════════════════════════════════════════════════════════════════
   # Phase 3 — Container Build & Push
