@@ -12,7 +12,7 @@ concurrency:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  PROJECT_NAME: shopsmart-v5
+  PROJECT_NAME: shopsmart-v6
   ENVIRONMENT: dev
 
 jobs:
@@ -102,9 +102,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: terraform/terraform.tfstate
-          key: terraform-state-main-${{ github.sha }}
+          key: terraform-state-v6-${{ github.sha }}
           restore-keys: |
-            terraform-state-main-
+            terraform-state-v6-
 
       - name: Terraform Init
         run: terraform init -input=false
@@ -112,16 +112,6 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
-      - name: Force cleanup blocking ECS services
-        run: |
-          echo "Finding and force-deleting active ECS services that are blocking Terraform from deleting the old cluster..."
-          SERVICES=$(aws ecs list-services --cluster shopsmart-app-dev-cluster --query "serviceArns" --output text 2>/dev/null || echo "")
-          for SERVICE in $SERVICES; do
-            echo "Deleting service: $SERVICE"
-            aws ecs update-service --cluster shopsmart-app-dev-cluster --service "$SERVICE" --desired-count 0 || true
-            aws ecs delete-service --cluster shopsmart-app-dev-cluster --service "$SERVICE" --force || true
-          done
-          sleep 10
 
       - name: Terraform Plan
         run: |
@@ -171,7 +161,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: terraform/terraform.tfstate
-          key: terraform-state-main-${{ github.sha }}
+          key: terraform-state-v6-${{ github.sha }}
 
   # ══════════════════════════════════════════════════════════════════════════
   # Phase 3 — Container Build & Push
